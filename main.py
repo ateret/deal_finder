@@ -8,17 +8,22 @@ import requests
 
 
 def create_data_directory() -> os.PathLike:
+    """
+    Creates a directory to store data from RSS feeds.
+    Returns path to this directory
+    """
+    # Location of py.file this method is in
+    # @TODO maybe change it to dynamic/user defined location
     py_file_location = os.path.join(pathlib.Path(__file__).parent.resolve())
-    # Creates 'data' directory, as a location to store all json data files
-    if os.path.isdir(os.path.join(py_file_location, 'data')):
-        pass
-    else:
+
+    # Checks if directory exists, creates it if not
+    if not os.path.isdir(os.path.join(py_file_location, 'data')):
         try:
             print('"data" directory created')
             os.mkdir(os.path.join(py_file_location, 'data'))
-            return py_file_location
         except OSError as err:
             print(f'Error creating "data" directory: \n{err}')
+
     return py_file_location
 
 
