@@ -27,10 +27,13 @@ def create_data_directory() -> os.PathLike:
     return py_file_location
 
 
-# Saves feedparser dictionary in json file with given name and "_data" suffix
 def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
-    # Creates paths used to be used later. py_file_location is a location of this py.file
+    """
+    Saves feedparser dictionary in json file with given name and "_data" suffix,
+    or appends new entries into existing dictionary, omitting duplicates
+    """
 
+    # Creates paths used to be used later. py_file_location is a location of this py.file
     data_json_filename = os.path.join(create_data_directory(), 'data', name + '_data.json')
     post_counter = len(rss_data.entries)
 
@@ -40,30 +43,39 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
             with open(data_json_filename, 'r', encoding="utf-8") as f:
                 # Loads new data to append new entries to
                 data = json.load(f)
+
+                # Saving id of existing entries, to exclude duplicates later
+                id_list = []
+                for x in range(len(data)):
+                    id_list.append(data[x].get('id'))
+
+                # Appending new post to data dictionary, if they are not a duplicate
                 for post in range(post_counter):
                     post_content = dict(rss_data.entries[post])
-                    print(type(data[0]))
-                    data.append(post_content)
-                    print('Appended!')
+                    if post_content['id'] not in id_list:
+                        data.append(post_content)
+                        print('Appended new post to .json file!')
+                        id_list.append(post_content['id'])
 
         except Exception as err:
-            print(f'Error occured while reading a file: {err}')
+            print(f'Error occurred while reading a file: {err}')
 
+        # Dumps new dictionary into json file
         try:
             with open(data_json_filename, 'w', encoding="utf-8") as f:
-                # Dumps new data
                 json.dump(data, f, ensure_ascii=False, indent=4)
         except Exception as err:
-            print(f'Error occured while saving a file: {err}')
+            print(f'Error occurred while saving a file: {err}')
     else:
-        # Saves json data file in 'data' directory
+
+        # Creates json file in 'data' directory
         try:
             with open(data_json_filename, 'at', encoding="utf-8") as f:
                 json.dump(rss_data.entries, f, ensure_ascii=False, indent=4)
         except Exception as err:
             print(err)
-        print(rss_data.feed.title + ' RSS data saved in ' + data_json_filename)
-        return
+    print(rss_data.feed.title + ' RSS data saved in ' + data_json_filename)
+    return
 
 
 def print_rss_data(rss_data: feedparser.util.FeedParserDict) -> dict:
