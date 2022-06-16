@@ -4,10 +4,13 @@ import pathlib
 import time
 
 import feedparser
-import requests
 
 
-def create_data_directory() -> os.PathLike:
+def get_undesired_keys() -> list:
+    return ['published', 'guidislink', 'base', 'media_content', 'scheme']
+
+
+def create_data_directory() -> bytes | str:
     """
     Creates a directory to store data from RSS feeds.
     Returns path to this directory
@@ -51,20 +54,21 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
 
                 # Appending new post to data dictionary, if they are not a duplicate
                 for post in range(post_counter):
-                    post_content = dict(rss_data.entries[post])
+
+                    post_content = get_important_data(dict(rss_data.entries[post]), get_undesired_keys())
                     if post_content['id'] not in id_list:
                         data.append(post_content)
                         print('Appended new post to .json file!')
                         id_list.append(post_content['id'])
 
-        except Exception as err:
+        except OSError as err:
             print(f'Error occurred while reading a file: {err}')
 
         # Dumps new dictionary into json file
         try:
             with open(data_json_filename, 'w', encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-        except Exception as err:
+        except OSError as err:
             print(f'Error occurred while saving a file: {err}')
     else:
 
@@ -72,13 +76,14 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
         try:
             with open(data_json_filename, 'at', encoding="utf-8") as f:
                 json.dump(rss_data.entries, f, ensure_ascii=False, indent=4)
-        except Exception as err:
+        except OSError as err:
             print(err)
     print(rss_data.feed.title + ' RSS data saved in ' + data_json_filename)
     return
 
 
 def print_rss_data(rss_data: feedparser.util.FeedParserDict) -> dict:
+    # @ TODO Redo this entire method
     post_counter = len(rss_data.entries)
     print('Number of Posts: ', post_counter)
     date_format = '%x (%a)'
@@ -89,49 +94,37 @@ def print_rss_data(rss_data: feedparser.util.FeedParserDict) -> dict:
         print('NR:' + str(post))
         print('Title :', post_content.title)
         print('Link: ', post_content.link)
-        print('Updated: ', time.strftime(date_format, (post_content.updated_parsed)))
-        print('Time: ', time.strftime(time_format, (post_content.updated_parsed)))
+        print('Updated: ', time.strftime(date_format, post_content.updated_parsed))
+        print('Time: ', time.strftime(time_format, post_content.updated_parsed))
         print("-" * 100)
 
     return
 
 
-def get_data(url: str) -> dict:
-    server_response = requests.get(url)
-    print(server_response)
+def get_important_data(important_data: dict, undesired_keys: list) -> dict:
+    important_data = dict(important_data)
+    copied_data = important_data.copy()
 
-    return server_response
+    for key, val in important_data.items():
 
+        # Deletes the key if it's on a list of undesired keys
+        if key in undesired_keys:
+            print(f'Deleting {key}')
+            copied_data.pop(key)
 
-# pepper_rss_data_new = feedparser.parse('HTTPS://pepper.pl/rss/nowe')
-# pepper_rss_data_hot = feedparser.parse('HTTPS://pepper.pl/rss/hot')
-pepper_rss_data_all = feedparser.parse('HTTPS://pepper.pl/rss/wszystkie')
-# print_rss_data(pepper_rss_data_all)
-# save_rss_data(pepper_rss_data_new, 'pepper_new')
-# save_rss_data(pepper_rss_data_hot, 'pepper_hot')
-save_rss_data(pepper_rss_data_all, 'pepper_all')
+        # If value is a list, converts it into a dict
+        if isinstance(val, list):
+            # @TODO make it work with lists with more then one entry
+            print(val)
+            copied_data[key] = get_important_data(val[0], undesired_keys)
 
-# pepper_rss_hot = feedparser.parse('HTTPS://pepper.pl/rss/hot')
+        # If value is a dict, run this method recursively
+        if isinstance(val, dict):
+            copied_data[key] = get_important_data(val, undesired_keys)
 
-
-# print(pepper_rss_hot.feed)
-# print(type(pepper_rss_hot.entries[0]))
-
-# data_json_filename = (os.path.join(pathlib.Path(__file__).parent.resolve(), 'data.json'))
-# with open(data_json_filename, 'w') as f:
-#     json.dump(pepper_rss_hot.entries[0], f, indent=4)
-
-# baseurl = 'https://rickandmortyapi.com/api/'
-# endpoint = 'character'
-#
-# pepperURL = 'https://www.pepper.pl'
-# p_endpoint = '/thread/hottest'
-#
-# data = get_data(pepperURL)
-# print(data.text)
+    return copied_data
 
 
-# nr_of_pages = data['info']['pages']
-#
-# print(nr_of_pages)
-# print(data['results'][0]['name'])
+if __name__ == "__main__":
+    pepper_rss_data_all = feedparser.parse('HTTPS://pepper.pl/rss/wszystkie')
+    save_rss_data(pepper_rss_data_all, 'pepper_all')
