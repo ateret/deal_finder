@@ -10,6 +10,19 @@ def get_undesired_keys() -> list:
     return ['published', 'guidislink', 'base', 'media_content', 'scheme']
 
 
+def list_to_dict(l: list) -> dict:
+    d = {}
+    if isinstance(l, list):
+        for x in range(len(l))
+            if not isinstance(val[x], list):
+                # @TODO make it work with lists with more then one entry
+                print(val)
+                copied_data[key] = get_important_data(val[0], undesired_keys)
+    else:
+        raise TypeError(f'{l} is not a list')
+    return d
+
+
 def create_data_directory() -> bytes | str:
     """
     Creates a directory to store data from RSS feeds.
