@@ -2,18 +2,39 @@ import json
 import os
 import pathlib
 import time
+import csv
 
 import feedparser
 
-
 def get_undesired_keys() -> list:
-    return ['published', 'guidislink', 'base', 'media_content', 'scheme']
 
+    # Sets path to be used later. py_file_location is a location of this py.file
+    # @TODO maybe change it to dynamic/user defined location
+    py_file_location = os.path.join(pathlib.Path(__file__).parent.resolve())
+
+    undesired_keys_csv = os.path.join(py_file_location, 'config', 'undesired_keywords.csv')
+    undesired_keys = ['published', 'guidislink', 'base', 'media_content', 'scheme']
+
+    if not os.path.isdir(os.path.join(py_file_location, 'config')):
+        create_directory('config')
+
+    if not os.path.isfile(undesired_keys_csv):
+        with open(undesired_keys_csv, 'wt', newline='') as f:
+            csv_writer=csv.writer(f)
+            csv_writer.writerow(undesired_keys)
+    else:
+        with open(undesired_keys_csv, 'r', newline='') as f:
+            csv_reader = csv.reader(f)
+            tmp_list = list(csv_reader)
+            undesired_keys = tmp_list[0]
+
+    print(undesired_keys)
+    return undesired_keys
 
 def list_to_dict(l: list) -> dict:
     d = {}
     if isinstance(l, list):
-        for x in range(len(l))
+        for x in range(len(l)):
             if not isinstance(val[x], list):
                 # @TODO make it work with lists with more then one entry
                 print(val)
@@ -23,9 +44,9 @@ def list_to_dict(l: list) -> dict:
     return d
 
 
-def create_data_directory() -> bytes | str:
+def create_directory(name: str) -> bytes | str:
     """
-    Creates a directory to store data from RSS feeds.
+    Creates a directory.
     Returns path to this directory
     """
     # Location of py.file this method is in
@@ -33,14 +54,14 @@ def create_data_directory() -> bytes | str:
     py_file_location = os.path.join(pathlib.Path(__file__).parent.resolve())
 
     # Checks if directory exists, creates it if not
-    if not os.path.isdir(os.path.join(py_file_location, 'data')):
+    if not os.path.isdir(os.path.join(py_file_location, name)):
         try:
-            print('"data" directory created')
-            os.mkdir(os.path.join(py_file_location, 'data'))
+            print(f'{name} directory created')
+            os.mkdir(os.path.join(py_file_location, name))
         except OSError as err:
-            print(f'Error creating "data" directory: \n{err}')
+            print(f'Error creating {name} directory: \n{err}')
 
-    return py_file_location
+    return os.path.join(py_file_location, name)
 
 
 def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
@@ -49,8 +70,8 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
     or appends new entries into existing dictionary, omitting duplicates
     """
 
-    # Creates paths used to be used later. py_file_location is a location of this py.file
-    data_json_filename = os.path.join(create_data_directory(), 'data', name + '_data.json')
+    # Creates paths to be used later. py_file_location is a location of this py.file
+    data_json_filename = os.path.join(create_directory('data'), name + '_data.json')
     post_counter = len(rss_data.entries)
 
     # Checks if file exists, to see if it needs to append or create
