@@ -1,47 +1,10 @@
+import csv
 import json
 import os
 import pathlib
 import time
-import csv
 
 import feedparser
-
-def get_undesired_keys() -> list:
-
-    # Sets path to be used later. py_file_location is a location of this py.file
-    # @TODO maybe change it to dynamic/user defined location
-    py_file_location = os.path.join(pathlib.Path(__file__).parent.resolve())
-
-    undesired_keys_csv = os.path.join(py_file_location, 'config', 'undesired_keywords.csv')
-    undesired_keys = ['published', 'guidislink', 'base', 'media_content', 'scheme']
-
-    if not os.path.isdir(os.path.join(py_file_location, 'config')):
-        create_directory('config')
-
-    if not os.path.isfile(undesired_keys_csv):
-        with open(undesired_keys_csv, 'wt', newline='') as f:
-            csv_writer=csv.writer(f)
-            csv_writer.writerow(undesired_keys)
-    else:
-        with open(undesired_keys_csv, 'r', newline='') as f:
-            csv_reader = csv.reader(f)
-            tmp_list = list(csv_reader)
-            undesired_keys = tmp_list[0]
-
-    print(undesired_keys)
-    return undesired_keys
-
-def list_to_dict(l: list) -> dict:
-    d = {}
-    if isinstance(l, list):
-        for x in range(len(l)):
-            if not isinstance(val[x], list):
-                # @TODO make it work with lists with more then one entry
-                print(val)
-                copied_data[key] = get_important_data(val[0], undesired_keys)
-    else:
-        raise TypeError(f'{l} is not a list')
-    return d
 
 
 def create_directory(name: str) -> bytes | str:
@@ -64,6 +27,83 @@ def create_directory(name: str) -> bytes | str:
     return os.path.join(py_file_location, name)
 
 
+def get_undesired_keys() -> list:
+    """
+    This method either gets a list of undesired RSS keys,
+    from config/undesired_keywords.csv or creates that file
+    with default undesired keys
+    """
+    # Sets path to be used later. py_file_location is a location of this py.file
+    # @TODO maybe change it to dynamic/user defined location
+    py_file_location = os.path.join(pathlib.Path(__file__).parent.resolve())
+    default_undesired_keys = ['published', 'guidislink', 'base', 'media_content', 'scheme', 'width', 'height']
+    undesired_keys_csv = os.path.join(py_file_location, 'config', 'undesired_keywords.csv')
+
+    # If this file and its directory doesn't exists, creates it
+    if not os.path.isdir(os.path.join(py_file_location, 'config')):
+        create_directory('config')
+
+    if not os.path.isfile(undesired_keys_csv):
+        with open(undesired_keys_csv, 'wt', newline='') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(default_undesired_keys)
+
+    # Opens undesired_keywords.csv
+    with open(undesired_keys_csv, 'r', newline='') as f:
+        csv_reader = csv.reader(f)
+        tmp_list = list(csv_reader)
+        undesired_keys = tmp_list[0]
+
+    return undesired_keys
+
+
+def list_of_dicts_to_dict(l: list) -> dict:
+    """
+    Simple method that creates dictionaries from lists.
+    This makes raw RSS data easier to read and modify later
+    """
+    d = {}
+    tmp = []
+
+    # Checks if list is a list of dictionaries, and list itself
+    if isinstance(l, list):
+        for x in range(len(l)):
+            if not isinstance(l[x], list) and isinstance(l[x], dict):
+                tmp.append(l[x])
+
+            elif isinstance(l[x], list):
+                d.list_of_dicts_to_dict(l[x])
+            elif not isinstance(l[x], dict):
+                print(f'{l[x]} is not a list of dictionaries')
+    else:
+        raise TypeError(f'{l} is not a list')
+
+    d = dict.fromkeys(range(len(l)), tmp)
+    return d
+
+
+def dict_clean_bad_keys(important_data: dict, undesired_keys: list) -> dict:
+    important_data = dict(important_data)
+    copied_data = important_data.copy()
+
+    for key, val in important_data.items():
+
+        # Deletes the key if it's on a list of undesired keys
+        if key in undesired_keys:
+            # print(f'Deleting {key}')
+            copied_data.pop(key)
+
+        # If value is a list of dictionaries,  converts it into a dict, recursively
+        if isinstance(val, list):
+            list_of_dicts_to_dict(val)
+
+        # If value is a dict, run this method again, recursively
+        if isinstance(val, dict):
+            copied_data[key] = dict_clean_bad_keys(val, undesired_keys)
+
+    return copied_data
+
+
 def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
     """
     Saves feedparser dictionary in json file with given name and "_data" suffix,
@@ -73,7 +113,10 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
     # Creates paths to be used later. py_file_location is a location of this py.file
     data_json_filename = os.path.join(create_directory('data'), name + '_data.json')
     post_counter = len(rss_data.entries)
+    undesired_keys = get_undesired_keys()
 
+
+    print(f'Deleting undesired keys from RSS data \nUndesired keys: {undesired_keys} ')
     # Checks if file exists, to see if it needs to append or create
     if os.path.isfile(data_json_filename):
         try:
@@ -89,10 +132,10 @@ def save_rss_data(rss_data: feedparser.util.FeedParserDict, name: str):
                 # Appending new post to data dictionary, if they are not a duplicate
                 for post in range(post_counter):
 
-                    post_content = get_important_data(dict(rss_data.entries[post]), get_undesired_keys())
+                    post_content = dict_clean_bad_keys(dict(rss_data.entries[post]), get_undesired_keys())
                     if post_content['id'] not in id_list:
                         data.append(post_content)
-                        print('Appended new post to .json file!')
+                        print(f'Appended new post: "{post_content["title"]}" to .json file!')
                         id_list.append(post_content['id'])
 
         except OSError as err:
@@ -135,28 +178,7 @@ def print_rss_data(rss_data: feedparser.util.FeedParserDict) -> dict:
     return
 
 
-def get_important_data(important_data: dict, undesired_keys: list) -> dict:
-    important_data = dict(important_data)
-    copied_data = important_data.copy()
 
-    for key, val in important_data.items():
-
-        # Deletes the key if it's on a list of undesired keys
-        if key in undesired_keys:
-            print(f'Deleting {key}')
-            copied_data.pop(key)
-
-        # If value is a list, converts it into a dict
-        if isinstance(val, list):
-            # @TODO make it work with lists with more then one entry
-            print(val)
-            copied_data[key] = get_important_data(val[0], undesired_keys)
-
-        # If value is a dict, run this method recursively
-        if isinstance(val, dict):
-            copied_data[key] = get_important_data(val, undesired_keys)
-
-    return copied_data
 
 
 if __name__ == "__main__":
